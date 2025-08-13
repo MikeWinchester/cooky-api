@@ -13,7 +13,7 @@ class AIService {
   async generateRecipe(payload: GenerateRecipeDto) {
     try {
       const response = await axios.post(
-        `${config.AI_SERVICE_URL}/api/v1/generate-recipe`,
+        `${config.AI_SERVICE_URL}/api/v1/generate-multiple-recipes`,
         payload,
         {
           headers: {
