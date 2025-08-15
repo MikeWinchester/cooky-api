@@ -1,8 +1,22 @@
 export interface Ingredient {
   ingredient_id: string;
   name: string;
+  canonical_name: string;
+  category?: string;
+  aliases?: string[];
+  common_units?: string[];
+  nutritional_info?: any;
+  is_primary?: boolean;
+  created_at?: string;
+}
+
+export interface CreateIngredientDto {
+  name: string;
   canonical_name?: string;
   category?: string;
+  aliases?: string[];
+  common_units?: string[];
+  nutritional_info?: any;
   is_primary?: boolean;
 }
 
@@ -27,4 +41,5 @@ export interface IngredientSearchResult {
   ingredient_id: string;
   name: string;
   category?: string;
+  canonical_name: string;
 }

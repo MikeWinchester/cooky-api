@@ -13,4 +13,5 @@ export default {
   CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
   RATE_LIMIT_WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
   RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+  UNSPLASH_ACCESS_KEY: process.env.UNSPLASH_ACCESSS_KEY || '',
 };

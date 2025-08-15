@@ -29,6 +29,13 @@ export default class ApiResponse {
     });
   }
 
+  static forbidden(res: Response, message = 'Forbidden') {
+    return res.status(403).json({
+      success: false,
+      message
+    });
+  }
+
   static notFound(res: Response, message = 'Not Found') {
     return res.status(404).json({
       success: false,
@@ -38,6 +45,20 @@ export default class ApiResponse {
 
   static conflict(res: Response, message = 'Conflict') {
     return res.status(409).json({
+      success: false,
+      message
+    });
+  }
+
+  static unprocessableEntity(res: Response, message = 'Unprocessable Entity') {
+    return res.status(422).json({
+      success: false,
+      message
+    });
+  }
+
+  static internalServerError(res: Response, message = 'Internal Server Error') {
+    return res.status(500).json({
       success: false,
       message
     });
