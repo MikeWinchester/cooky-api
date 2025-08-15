@@ -16,7 +16,7 @@ class ShoppingController {
       }
       
       const userId = req.user.user_id;
-      const { recipe_id, name, items }: CreateShoppingListDto & { name?: string } = req.body;
+      const { recipe_id, name, description, items }: CreateShoppingListDto & { name?: string } = req.body;
 
       // Generar IDs únicos para cada item y marcarlos como no comprados
       const processedItems: ShoppingListItem[] = items.map(item => ({
@@ -26,11 +26,13 @@ class ShoppingController {
       }));
 
       const listName = name || `Lista de Compras - ${new Date().toLocaleDateString()}`;
+      const listDescription = description || this.generateAutoDescription(processedItems);
 
       const { data: shoppingList, error } = await supabaseService.createShoppingList({
         user_id: userId,
         recipe_id,
         name: listName,
+        description: listDescription,
         items: processedItems
       });
 
@@ -73,11 +75,13 @@ class ShoppingController {
       }));
 
       const listName = `${recipe.name} - Lista de Compras`;
+      const listDescription = `Lista de compras generada para la receta "${recipe.name}". Preparada para ${recipe.servings * servings_multiplier} porciones.`;
 
       const { data: shoppingList, error } = await supabaseService.createShoppingList({
         user_id: userId,
         recipe_id: recipe_id,
         name: listName,
+        description: listDescription,
         items
       });
 
@@ -103,18 +107,21 @@ class ShoppingController {
 
       if (error) throw error;
 
-      // Calcular estadísticas para cada lista
-      const listsWithStats = lists?.map(list => {
+      // Calcular estadísticas y formatear datos para cada lista
+      const listsWithDetails = lists?.map(list => {
         const items = Array.isArray(list.items) ? list.items : JSON.parse(list.items || '[]');
-        //const stats = this.calculateListStats(items);
+        const stats = this.calculateListStats(items);
         
         return {
           ...list,
-          //stats
+          stats,
+          formatted_created_at: this.formatDate(list.created_at),
+          item_count: items.length,
+          description: list.description || this.generateAutoDescription(items)
         };
       });
 
-      return ApiResponse.success(res, { lists: listsWithStats });
+      return ApiResponse.success(res, { lists: listsWithDetails });
     } catch (error) {
       return ApiResponse.error(res, error);
     }
@@ -150,7 +157,9 @@ class ShoppingController {
         list: {
           ...list,
           items,
-          stats
+          stats,
+          formatted_created_at: this.formatDate(list.created_at),
+          description: list.description || this.generateAutoDescription(items)
         }
       });
     } catch (error) {
@@ -438,7 +447,7 @@ class ShoppingController {
 
       const userId = req.user.user_id;
       const { id } = req.params;
-      const { name } = req.body;
+      const { name, description } = req.body;
 
       // Obtener la lista original
       const { data: originalList } = await supabaseService.getShoppingListById(id);
@@ -459,11 +468,13 @@ class ShoppingController {
       }));
 
       const duplicatedName = name || `${originalList.name} - Copia`;
+      const duplicatedDescription = description || `${originalList.description || ''} (Copia creada el ${new Date().toLocaleDateString()})`;
 
       const { data: duplicatedList, error } = await supabaseService.createShoppingList({
         user_id: userId,
         recipe_id: originalList.recipe_id,
         name: duplicatedName,
+        description: duplicatedDescription,
         items: newItems
       });
 
@@ -493,6 +504,106 @@ class ShoppingController {
       pending_items: pendingItems,
       completion_percentage: completionPercentage
     };
+  }
+
+  /**
+   * Formatea una fecha para mostrar de manera amigable
+   */
+  private formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Si es hoy
+    if (diffDays === 1) {
+      return `Hoy a las ${date.toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })}`;
+    }
+
+    // Si es ayer
+    if (diffDays === 2) {
+      return `Ayer a las ${date.toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })}`;
+    }
+
+    // Si es hace menos de una semana
+    if (diffDays <= 7) {
+      return `Hace ${diffDays - 1} días`;
+    }
+
+    // Si es más antigua
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  /**
+   * Genera una descripción automática basada en los items
+   */
+  private generateAutoDescription(items: ShoppingListItem[]): string {
+    if (items.length === 0) {
+      return 'Lista vacía';
+    }
+
+    if (items.length === 1) {
+      return `Lista con 1 artículo: ${items[0].name}`;
+    }
+
+    if (items.length <= 5) {
+      const itemNames = items.slice(0, 3).map(item => item.name).join(', ');
+      return `Lista con ${items.length} artículos: ${itemNames}${items.length > 3 ? ' y más...' : ''}`;
+    }
+
+    // Categorizar items por tipo (básico)
+    const categories = this.categorizeItems(items);
+    const categoryDescriptions = Object.entries(categories)
+      .filter(([_, count]) => count > 0)
+      .slice(0, 3)
+      .map(([category, count]) => `${count} ${category}`)
+      .join(', ');
+
+    return `Lista con ${items.length} artículos incluyendo ${categoryDescriptions}`;
+  }
+
+  /**
+   * Categoriza items básicamente por palabras clave
+   */
+  private categorizeItems(items: ShoppingListItem[]): Record<string, number> {
+    const categories = {
+      'lácteos': 0,
+      'carnes': 0,
+      'vegetales': 0,
+      'frutas': 0,
+      'condimentos': 0,
+      'otros': 0
+    };
+
+    items.forEach(item => {
+      const name = item.name.toLowerCase();
+      
+      if (name.includes('leche') || name.includes('queso') || name.includes('yogurt') || name.includes('mantequilla')) {
+        categories.lácteos++;
+      } else if (name.includes('pollo') || name.includes('carne') || name.includes('pescado') || name.includes('jamón')) {
+        categories.carnes++;
+      } else if (name.includes('tomate') || name.includes('cebolla') || name.includes('ajo') || name.includes('pimiento') || name.includes('lechuga')) {
+        categories.vegetales++;
+      } else if (name.includes('manzana') || name.includes('plátano') || name.includes('naranja') || name.includes('limón')) {
+        categories.frutas++;
+      } else if (name.includes('sal') || name.includes('pimienta') || name.includes('aceite') || name.includes('vinagre') || name.includes('especias')) {
+        categories.condimentos++;
+      } else {
+        categories.otros++;
+      }
+    });
+
+    return categories;
   }
 }
 

@@ -209,6 +209,7 @@ class SupabaseService {
     user_id: string;
     recipe_id?: string;
     name: string;
+    description?: string; // Nueva propiedad
     items: ShoppingListItem[];
   }) {
     return this.supabase.from('shopping_lists').insert([{
@@ -257,6 +258,27 @@ class SupabaseService {
     );
 
     return this.updateShoppingListItems(listId, updatedItems);
+  }
+
+  // Nuevo método para actualizar lista completa (incluyendo descripción)
+  async updateShoppingList(listId: string, updates: {
+    name?: string;
+    description?: string;
+    items?: ShoppingListItem[];
+  }) {
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.items !== undefined) updateData.items = JSON.stringify(updates.items);
+
+    return this.supabase
+      .from('shopping_lists')
+      .update(updateData)
+      .eq('list_id', listId)
+      .select();
   }
 
   async deleteShoppingList(listId: string) {
