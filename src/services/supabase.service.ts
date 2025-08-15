@@ -347,12 +347,20 @@ class SupabaseService {
   /**
    * Busca recetas similares en cache basado en ingredientes
    */
-  async findSimilarCachedRecipes(ingredients: string[], userId?: string) {
+  async findSimilarCachedRecipes(ingredients: string[], userId?: string, similarityThreshold: number = 0.5) {
+    // Normalizar ingredientes de entrada (minúsculas y sin espacios extra)
+    const normalizedIngredients = ingredients.map(ing => ing.trim().toLowerCase());
+    
     let query = this.supabase
       .from('ai_recipes')
       .select(`
         *,
-        recipe_ingredients (*)
+        recipe_ingredients (
+          name,
+          quantity,
+          unit,
+          is_optional
+        )
       `)
       .eq('is_cached', true)
       .gt('cached_until', new Date().toISOString());
@@ -361,7 +369,54 @@ class SupabaseService {
       query = query.eq('user_id', userId);
     }
 
-    return query.order('created_at', { ascending: false }).limit(5);
+    const { data: allRecipes, error } = await query.order('created_at', { ascending: false });
+    
+    if (error || !allRecipes) {
+      return { data: null, error };
+    }
+
+    // Filtrar recetas por similitud de ingredientes
+    const similarRecipes = allRecipes.filter(recipe => {
+      if (!recipe.recipe_ingredients || recipe.recipe_ingredients.length === 0) {
+        return false;
+      }
+
+      // Extraer nombres de ingredientes de la receta (normalizados)
+      const recipeIngredients = recipe.recipe_ingredients.map((ri: any) => 
+        ri.name.trim().toLowerCase()
+      );
+
+      // Calcular similitud (ingredientes coincidentes / total de ingredientes únicos)
+      const commonIngredients = normalizedIngredients.filter(ing => 
+        recipeIngredients.some((recipeIng: string) => 
+          recipeIng.includes(ing) || ing.includes(recipeIng)
+        )
+      );
+
+      const totalUniqueIngredients = new Set([...normalizedIngredients, ...recipeIngredients]).size;
+      const similarity = commonIngredients.length / Math.max(normalizedIngredients.length, recipeIngredients.length);
+      
+      return similarity >= similarityThreshold;
+    });
+
+    // Ordenar por similitud (más ingredientes comunes primero)
+    const sortedSimilarRecipes = similarRecipes
+      .map(recipe => {
+        const recipeIngredients = recipe.recipe_ingredients.map((ri: any) => 
+          ri.name.trim().toLowerCase()
+        );
+        const commonCount = normalizedIngredients.filter(ing => 
+          recipeIngredients.some((recipeIng: string) => 
+            recipeIng.includes(ing) || ing.includes(recipeIng)
+          )
+        ).length;
+        
+        return { ...recipe, commonIngredientsCount: commonCount };
+      })
+      .sort((a, b) => b.commonIngredientsCount - a.commonIngredientsCount)
+      .slice(0, 5);
+
+    return { data: sortedSimilarRecipes, error: null };
   }
 }
 

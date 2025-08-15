@@ -106,11 +106,11 @@ class ShoppingController {
       // Calcular estadísticas para cada lista
       const listsWithStats = lists?.map(list => {
         const items = Array.isArray(list.items) ? list.items : JSON.parse(list.items || '[]');
-        const stats = this.calculateListStats(items);
+        //const stats = this.calculateListStats(items);
         
         return {
           ...list,
-          stats
+          //stats
         };
       });
 
