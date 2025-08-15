@@ -74,26 +74,30 @@ class RecipeController {
       const savedRecipes = [];
       for (const recipe of validatedRecipes.filter(r => r.is_safe)) {
         try {
-          const { data: savedRecipe } = await supabaseService.saveCachedRecipe({
+          console.log('Attempting to cache recipe:', recipe.name);
+          
+          const { data: savedRecipe, error } = await supabaseService.saveCachedRecipe({
             user_id: userId,
             name: recipe.name,
             description: recipe.description,
             steps: recipe.steps,
             ingredients: recipe.ingredients,
             cooking_time: recipe.cooking_time,
-            servings: recipe.servings,
-            difficulty: recipe.difficulty,
+            servings: recipe.servings || 1,
+            difficulty: recipe.difficulty || 'medio',
             model_version: recipe.model_version,
             image_url: recipe.image_url,
             prompt: optimizedPrompt
           });
           
+          if (error) {
+            console.error('Error caching recipe:', error);
+            // Continuar con las otras recetas sin fallar todo el proceso
+            continue;
+          }
+
           if (savedRecipe) {
-            savedRecipes.push({
-              ...savedRecipe,
-              ingredients: recipe.ingredients,
-              steps: recipe.steps
-            });
+            savedRecipes.push(savedRecipe);
           }
         } catch (error) {
           console.error('Error caching recipe:', error);
@@ -101,9 +105,13 @@ class RecipeController {
         }
       }
 
+      // Si no pudimos guardar ninguna receta en cache, devolver las recetas validadas originales
+      const recipesToReturn = savedRecipes.length > 0 ? savedRecipes : validatedRecipes;
+
       return ApiResponse.success(res, { 
-        recipes: savedRecipes.length > 0 ? savedRecipes : validatedRecipes,
+        recipes: recipesToReturn,
         from_cache: false,
+        cached_count: savedRecipes.length,
         validation_summary: {
           total: recipes.length,
           safe: validatedRecipes.filter(r => r.is_safe).length,
@@ -111,6 +119,7 @@ class RecipeController {
         }
       });
     } catch (error) {
+      console.error('Error in generateRecipe:', error);
       return ApiResponse.error(res, error);
     }
   }

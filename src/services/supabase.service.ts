@@ -57,37 +57,82 @@ class SupabaseService {
     image_url?: string;
     prompt?: string;
   }) {
-    // Guardar receta como cache (48 horas)
-    const { data: recipe, error: recipeError } = await this.supabase
-      .from('ai_recipes')
-      .insert([{
-        ...recipeData,
+    try {
+      // 1. Preparar los datos para ai_recipes (SIN ingredients, solo steps)
+      const recipeToInsert = {
+        user_id: recipeData.user_id,
+        name: recipeData.name,
+        description: recipeData.description,
+        steps: recipeData.steps, // Los steps van como array en ai_recipes
+        cooking_time: recipeData.cooking_time,
+        servings: recipeData.servings,
+        difficulty: recipeData.difficulty,
+        model_version: recipeData.model_version,
+        image_url: recipeData.image_url,
+        prompt: recipeData.prompt,
         is_cached: true,
         cached_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), // 48 horas
         created_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
+      };
 
-    if (recipeError || !recipe) {
-      throw recipeError || new Error('Failed to save recipe');
+      // 2. Insertar la receta principal
+      const { data: recipe, error: recipeError } = await this.supabase
+        .from('ai_recipes')
+        .insert([recipeToInsert])
+        .select()
+        .single();
+
+      if (recipeError) {
+        console.error('Error inserting recipe:', recipeError);
+        throw recipeError;
+      }
+
+      if (!recipe) {
+        throw new Error('Failed to save recipe - no data returned');
+      }
+
+      // 3. Insertar los ingredientes en recipe_ingredients
+      if (recipeData.ingredients && recipeData.ingredients.length > 0) {
+        const ingredientsToInsert = recipeData.ingredients.map((ing, index) => ({
+          recipe_id: recipe.recipe_id,
+          ingredient_id: null, // Para recipes cacheadas, podemos no tener ingredient_id
+          name: ing.name,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          is_optional: ing.is_optional || false,
+          notes: ing.notes || null,
+          display_order: index + 1
+        }));
+
+        const { error: ingredientsError } = await this.supabase
+          .from('recipe_ingredients')
+          .insert(ingredientsToInsert);
+
+        if (ingredientsError) {
+          console.error('Error inserting ingredients:', ingredientsError);
+          
+          // Rollback: eliminar la receta si falló insertar ingredientes
+          await this.supabase
+            .from('ai_recipes')
+            .delete()
+            .eq('recipe_id', recipe.recipe_id);
+          
+          throw ingredientsError;
+        }
+      }
+
+      // 4. Retornar la receta con sus ingredientes
+      const completeRecipe = {
+        ...recipe,
+        ingredients: recipeData.ingredients
+      };
+
+      return { data: completeRecipe, error: null };
+
+    } catch (error) {
+      console.error('Error in saveCachedRecipe:', error);
+      return { data: null, error };
     }
-
-    // Guardar ingredientes
-    const ingredientsToInsert = recipeData.ingredients.map((ing, index) => ({
-      recipe_id: recipe.recipe_id,
-      ingredient_id: null, // Para recipes cacheadas, podemos no tener ingredient_id
-      name: ing.name,
-      quantity: ing.quantity,
-      unit: ing.unit,
-      is_optional: ing.is_optional || false,
-      notes: ing.notes,
-      display_order: index
-    }));
-
-    await this.supabase.from('recipe_ingredients').insert(ingredientsToInsert);
-
-    return { data: recipe, error: null };
   }
 
   async saveRecipeToUser(userId: string, recipeId: string) {
