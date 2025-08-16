@@ -54,7 +54,7 @@ export const shoppingListSchema = Joi.object({
       is_optional: Joi.boolean().optional(),
       notes: Joi.string().optional(),
     })
-  ).min(1).required(),
+  ).required(),
 });
 
 export const createFromRecipeSchema = Joi.object({

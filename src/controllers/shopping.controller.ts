@@ -12,7 +12,7 @@ class ShoppingController {
   /**
    * Crea una nueva lista de compras
    */
-  async createShoppingList(req: Request, res: Response) {
+  createShoppingList = async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         return ApiResponse.unauthorized(res, "User not authenticated");
@@ -27,7 +27,7 @@ class ShoppingController {
       }: CreateShoppingListDto & { name?: string } = req.body;
 
       // Generar IDs únicos para cada item y marcarlos como no comprados
-      const processedItems: ShoppingListItem[] = items.map((item) => ({
+      const processedItems: ShoppingListItem[] = (items ?? []).map((item) => ({
         ...item,
         item_id: uuidv4(),
         is_purchased: false,
@@ -58,7 +58,7 @@ class ShoppingController {
   /**
    * Crea una lista de compras desde una receta
    */
-  async createShoppingListFromRecipe(req: Request, res: Response) {
+  createShoppingListFromRecipe = async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         return ApiResponse.unauthorized(res, "User not authenticated");
@@ -131,12 +131,6 @@ class ShoppingController {
           ? list.items
           : JSON.parse(list.items || "[]");
         const stats = this.calculateListStats(items);
-        console.log("this:", this);
-        console.log("this.calculateListStats:", this.calculateListStats);
-        console.log(
-          "typeof this.calculateListStats:",
-          typeof this.calculateListStats
-        );
 
         return {
           ...list,
@@ -151,7 +145,7 @@ class ShoppingController {
     } catch (error) {
       return ApiResponse.error(res, error);
     }
-  };
+  }
 
   /**
    * Obtiene una lista de compras específica
@@ -195,7 +189,7 @@ class ShoppingController {
     } catch (error) {
       return ApiResponse.error(res, error);
     }
-  };
+  }
 
   /**
    * Actualiza el estado de compra de un item específico
