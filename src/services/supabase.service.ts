@@ -209,9 +209,12 @@ class SupabaseService {
     user_id: string;
     recipe_id?: string;
     name: string;
-    description?: string; // Nueva propiedad
+    description?: string;
     items: ShoppingListItem[];
   }) {
+
+    console.log('🔍 listData en servicio:', listData); // ← Agrega este log
+
     return this.supabase.from('shopping_lists').insert([{
       ...listData,
       created_at: new Date().toISOString(),

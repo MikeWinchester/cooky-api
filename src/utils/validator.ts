@@ -45,6 +45,7 @@ export const saveRecipeSchema = Joi.object({
 export const shoppingListSchema = Joi.object({
   recipe_id: Joi.string().optional(),
   name: Joi.string().optional(),
+  description: Joi.string().optional(), // ← AGREGADA
   items: Joi.array().items(
     Joi.object({
       ingredient_id: Joi.string().optional(),
@@ -54,7 +55,7 @@ export const shoppingListSchema = Joi.object({
       is_optional: Joi.boolean().optional(),
       notes: Joi.string().optional(),
     })
-  ).required(),
+  ).optional(), // ← CAMBIADO DE required() A optional()
 });
 
 export const createFromRecipeSchema = Joi.object({
@@ -77,6 +78,30 @@ export const addShoppingItemSchema = Joi.object({
 
 export const duplicateListSchema = Joi.object({
   name: Joi.string().optional(),
+  description: Joi.string().optional(), // ← AGREGADA para duplicar listas
+});
+
+// Schema para actualizar lista completa
+export const updateShoppingListSchema = Joi.object({
+  name: Joi.string().optional(),
+  description: Joi.string().optional(),
+  items: Joi.array().items(
+    Joi.object({
+      item_id: Joi.string().required(),
+      ingredient_id: Joi.string().optional(),
+      name: Joi.string().required(),
+      quantity: Joi.number().positive().required(),
+      unit: Joi.string().required(),
+      is_purchased: Joi.boolean().required(),
+      is_optional: Joi.boolean().optional(),
+      notes: Joi.string().optional(),
+    })
+  ).optional(),
+}).min(1); // Al menos una propiedad debe ser actualizada
+
+// Schema para toggle all items
+export const toggleAllItemsSchema = Joi.object({
+  is_purchased: Joi.boolean().required(),
 });
 
 // Schema para feedback de recetas
